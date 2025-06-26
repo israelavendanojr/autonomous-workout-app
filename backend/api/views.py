@@ -10,6 +10,6 @@ class CreateUserView(generics.CreateAPIView):
     # Here list of all diff objs when creating new one
     queryset = User.objects.all()
     # Tells view what data we need to accept
-    serializer_class = User
+    serializer_class = UserSerializer
     # Who can actually call this
     permission_classes = (AllowAny,)
