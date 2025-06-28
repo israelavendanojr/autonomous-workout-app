@@ -14,9 +14,16 @@ Here is the question to answer: {question}
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
 
-result = chain.invoke({
-    "resources": "https://www.aclu.org/know-your-rights/immigrants-rights#i-want-to-share-this-information-on-social-media",
-    "question": "What to do if I am detained near the border by Border Patrol?"
-})
 
-print(result)
+while True:
+    print("\n\n")
+    question = input("Ask your question (q to quit): ")
+    if question.lower() == "q":
+        break
+
+    result = chain.invoke({
+        "resources": [],
+        "question": question
+    })
+
+    print(result)
