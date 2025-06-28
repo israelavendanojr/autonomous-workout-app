@@ -6,7 +6,7 @@ model = OllamaLLM(model="llama3.2")
 
 template = """
 You are a helpful legal assistant answering questions about immigration.
-Use **only** the information provided in the following resources. If unsure, say "I don't know."
+Do not fabricate PDF titles or page numbers. If metadata is missing, say 'source unknown.'
 
 Respond clearly, citing the PDF source and page when applicable.
 
@@ -41,8 +41,10 @@ while True:
         break
     
     rag_docs = retriever.invoke(question)
+    print(f"Retrieved {len(rag_docs)} docs")
+    print("🔎 Sources passed to model:")
     for doc in rag_docs:
-        print(f"Retrieved from: {doc.metadata}")
+        print(f"- Source: {doc.metadata.get('source', 'unknown')} | Page: {doc.metadata.get('page_number', '?')}")
 
     result = chain.invoke({
         "resources": format_docs(rag_docs),
