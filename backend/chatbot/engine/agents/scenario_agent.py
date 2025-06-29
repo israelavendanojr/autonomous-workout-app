@@ -10,6 +10,11 @@ class ScenarioAgent:
             "door_opened": None,
             "consent_given": None
         },
+        "ICE Street Encounter": {
+            "had_warrant": None,
+            "door_opened": None,
+            "consent_given": None
+        },
         "Border Stop": {
             "port_of_entry": None,
             "visa_type": None,
@@ -76,20 +81,40 @@ class ScenarioAgent:
         - "Border Stop"
         - "Other"
 
-        Only respond with the exact type.
+        Respond with:
+        Scenario: <one of the five above>
+        Confidence: <decimal between 0.0 and 1.0>
 
         Input:
         {input}
-    """)
+        """)
+
         result = (classification_prompt | self.llm).invoke({"input": user_input})
 
-        # Store scenario type
-        self.scenario["type"] = result.strip().replace('"', '')
-        # Inject custom fields based on scenario type
-        self._inject_custom_fields()
+        scenario_match = re.search(r"Scenario:\s*(.*)", result)
+        confidence_match = re.search(r"Confidence:\s*(.*)", result)
 
+        if scenario_match:
+            self.scenario["type"] = scenario_match.group(1).strip()
+        else:
+            self.scenario["type"] = "Other"
+
+        if confidence_match:
+            try:
+                self.scenario["confidence_scores"]["scenario_classification"] = float(confidence_match.group(1).strip())
+            except:
+                self.scenario["confidence_scores"]["scenario_classification"] = None
+        else:
+            self.scenario["confidence_scores"]["scenario_classification"] = None
+
+        self._inject_custom_fields()
         self.scenario["description"] = user_input
+
         print(f"🧭 Scenario type identified: {self.scenario['type']}")
+        if self.scenario["confidence_scores"]["scenario_classification"] is not None:
+            print(f"🔍 Confidence: {self.scenario['confidence_scores']['scenario_classification']:.2f}")
+            if self.scenario["confidence_scores"]["scenario_classification"] < 0.7:
+                print("⚠️ I'm not very confident about this classification. I may need more details or clarification.")
 
     def _inject_custom_fields(self):
         scenario_type = self.scenario.get("type")
@@ -141,7 +166,6 @@ class ScenarioAgent:
                 print("⚠️ Could not parse question. Ending.")
                 break
 
-
             if not question or not target_field:
                 print("⚠️ Could not parse question. Ending.")
                 break
@@ -149,6 +173,26 @@ class ScenarioAgent:
             print(f"🤖 {question}")
             response = input("👤 ").strip()
             self.history.append((question, response))
+
+            # Handle clarification requests
+            if any(kw in response.lower() for kw in ["what do you mean", "why", "explain", "i don’t understand"]):
+                print("🤖 No problem! I'm asking because this detail helps determine your rights and what steps you should or shouldn't take.")
+                print("🤖 You can answer the question, or type 'skip' if you're unsure.")
+                continue
+
+            # Let user redo the last question
+            if response.lower() in ["go back", "change last answer"] and self.history:
+                last_q, _ = self.history.pop()
+                print(f"🔁 Let's redo: {last_q}")
+                new_response = input("👤 ").strip()
+                self.history.append((last_q, new_response))
+                self._assign_response_to_field(target_field, new_response)
+                continue
+
+            # Let user skip
+            if response.lower() in ["skip", "pass"]:
+                print("✅ Skipped.")
+                continue
 
             self._assign_response_to_field(target_field, response)
 
