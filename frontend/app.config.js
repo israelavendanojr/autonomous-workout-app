@@ -3,11 +3,11 @@ import "dotenv/config";
 
 export default {
   expo: {
-    name: "ImmigrationAid",
-    slug: "immigration-aid",
+    name: "AutonomousWorkoutApp",
+    slug: "autonomous-workout-app",
     version: "1.0.0",
     orientation: "portrait",
-    scheme: "immigrationaid",
+    scheme: "autonomousworkoutapp",
     userInterfaceStyle: "automatic",
     icon: "./assets/images/icon.png",
     splash: {
