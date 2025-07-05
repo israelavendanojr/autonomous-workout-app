@@ -1,82 +1,67 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+// src/context/AuthContext.tsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-interface User {
-  id: number;
-  email: string;
-  // Add more fields as needed
-}
-
-interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+type AuthContextType = {
+  user: any;
   loading: boolean;
-}
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+};
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  loading: true,
+  login: async () => {},
+  register: async () => {},
+  logout: async () => {},
+});
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const login = async (email: string, password: string) => {
-    try {
-      const response = await axios.post('http://localhost:8000/api/auth/login/', {
-        email,
-        password,
-      });
+    const res = await axios.post('http://localhost:8000/api/auth/login/', { email, password });
+    await AsyncStorage.setItem('token', res.data.access);
+    setUser(res.data.user); // if your backend returns user
+  };
 
-      const { access, refresh, user } = response.data;
-
-      await AsyncStorage.setItem('accessToken', access);
-      await AsyncStorage.setItem('refreshToken', refresh);
-      setUser(user);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    }
+  const register = async (email: string, password: string) => {
+    await axios.post('http://localhost:8000/api/auth/register/', { email, password });
+    await login(email, password);
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('accessToken');
-    await AsyncStorage.removeItem('refreshToken');
+    await AsyncStorage.removeItem('token');
     setUser(null);
   };
 
-  const loadUser = async () => {
-    try {
-      const token = await AsyncStorage.getItem('accessToken');
-      if (token) {
-        const response = await axios.get('http://localhost:8000/api/auth/user/', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setUser(response.data);
-      }
-    } catch (err) {
-      console.error('Auto-login failed:', err);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadUser();
+    const bootstrap = async () => {
+      const token = await AsyncStorage.getItem('token');
+      if (token) {
+        try {
+          const res = await axios.get('http://localhost:8000/api/auth/user/', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          setUser(res.data);
+        } catch {
+          await AsyncStorage.removeItem('token');
+        }
+      }
+      setLoading(false);
+    };
+    bootstrap();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, register, loading }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
